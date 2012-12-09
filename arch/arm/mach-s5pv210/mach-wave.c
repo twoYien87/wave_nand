@@ -967,22 +967,9 @@ static void panel_cfg_gpio(struct platform_device *pdev)
 	writel(0x2, S5P_MDNIE_SEL);
 #endif
 
-#ifdef CONFIG_WAVE_S8530
-	/* S8530 LCD Backlight */
-	s3c_gpio_cfgpin(GPIO_LCD_BL_PWM, GPIO_LCD_BL_PWM_AF);
-	s3c_gpio_setpull(GPIO_LCD_BL_PWM, S3C_GPIO_PULL_NONE);
-
-	/* S8530 LCD_ID pins */
-	s3c_gpio_cfgpin(GPIO_OLED_ID, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(GPIO_OLED_ID, S3C_GPIO_PULL_DOWN);
-
-	s3c_gpio_cfgpin(GPIO_DIC_ID, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(GPIO_DIC_ID, S3C_GPIO_PULL_DOWN);
-#else
-	s3c_gpio_setpull(GPIO_OLED_ID, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_DIC_ID, S3C_GPIO_PULL_NONE);
-#endif
-	s3c_gpio_setpull(GPIO_OLED_DET, S3C_GPIO_PULL_NONE);
+		s3c_gpio_setpull(GPIO_OLED_ID, S3C_GPIO_PULL_NONE);
+		s3c_gpio_setpull(GPIO_DIC_ID, S3C_GPIO_PULL_NONE);
+		s3c_gpio_setpull(GPIO_OLED_DET, S3C_GPIO_PULL_NONE);
 }
 
 void lcd_cfg_gpio_early_suspend(void)
@@ -1014,17 +1001,6 @@ void lcd_cfg_gpio_early_suspend(void)
 	gpio_set_value(GPIO_DISPLAY_CS, 0);
 	gpio_set_value(GPIO_DISPLAY_CLK, 0);
 	gpio_set_value(GPIO_DISPLAY_SI, 0);
-#ifdef CONFIG_WAVE_S8530
-	s3c_gpio_cfgpin(GPIO_OLED_ID, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(GPIO_OLED_ID, S3C_GPIO_PULL_DOWN);
-
-	s3c_gpio_cfgpin(GPIO_DIC_ID, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(GPIO_DIC_ID, S3C_GPIO_PULL_DOWN);
-#else
-	s3c_gpio_setpull(GPIO_OLED_DET, S3C_GPIO_PULL_DOWN);
-	s3c_gpio_setpull(GPIO_OLED_ID, S3C_GPIO_PULL_DOWN);
-	s3c_gpio_setpull(GPIO_DIC_ID, S3C_GPIO_PULL_DOWN);
-#endif
 }
 EXPORT_SYMBOL(lcd_cfg_gpio_early_suspend);
 
@@ -1040,7 +1016,7 @@ static int panel_reset_lcd(struct platform_device *pdev)
 
 	err = gpio_request(GPIO_MLCD_RST, "MLCD_RST");
 	if (err) {
-		printk(KERN_ERR "failed to request MP0(5) for "
+		printk(KERN_ERR "failed to request GPIO_MLCD_RST for "
 				"lcd reset control\n");
 		return err;
 	}
@@ -1063,19 +1039,6 @@ static int panel_reset_lcd(struct platform_device *pdev)
 
 #ifdef CONFIG_FB_S3C_LG4573
 
-int get_lcdtype(void)
-{
-	int panel_id;
-
-	panel_id = (gpio_get_value(GPIO_DIC_ID) << 1) | gpio_get_value(GPIO_OLED_ID);
-
-    printk("LCD_ID1=0x%x, LCD_ID2=0x%x, LCDTYPE=%d\n", gpio_get_value(GPIO_OLED_ID), gpio_get_value(GPIO_DIC_ID), panel_id);
-
-	return panel_id;
-}
-EXPORT_SYMBOL(get_lcdtype);
-
-
 //SLCD for S8530
 static struct s3c_platform_fb lg4573_data __initdata = {
 	.hw_ver		= 0x62,
@@ -1095,7 +1058,7 @@ static struct s3c_platform_fb lg4573_data __initdata = {
 static struct spi_board_info lg4573_spi_board_info[] __initdata = {
 	{
 		.modalias	= "lg4573",
-//		.platform_data	= &wave_panel_data,
+		.platform_data	= &wave_lg4573_panel_data,
 		.max_speed_hz	= 1200000,
 		.bus_num	= LCD_BUS_NUM,
 		.chip_select	= 0,
@@ -1122,7 +1085,7 @@ static struct s3c_platform_fb tl2796_data __initdata = {
 static struct spi_board_info tl2796_spi_board_info[] __initdata = {
 	{
 		.modalias	= "tl2796",
-		.platform_data	= &wave_panel_data,
+		.platform_data	= &wave_tl2796_panel_data,
 		.max_speed_hz	= 1200000,
 		.bus_num	= LCD_BUS_NUM,
 		.chip_select	= 0,
@@ -2054,19 +2017,11 @@ static struct s3c_platform_jpeg jpeg_plat __initdata = {
 };
 #endif
 
-/* I2C0 */
-static struct i2c_board_info i2c_devs0[] __initdata = {
-};
-
 static struct i2c_board_info i2c_devs4[] __initdata = {
 	{
 		I2C_BOARD_INFO("wm8994-samsung", (0x34>>1)),
 		.platform_data = &wm8994_pdata,
 	},
-};
-
-/* I2C1 */
-static struct i2c_board_info i2c_devs1[] __initdata = {
 };
 
 static void mxt224_power_on(void)
@@ -2087,8 +2042,8 @@ static u8 t7_config[] = {GEN_POWERCONFIG_T7,
 64, 255, 50};
 static u8 t8_config[] = {GEN_ACQUISITIONCONFIG_T8,
 7, 0, 5, 0, 0, 0, 9, 35};
-#if defined (CONFIG_WAVE_S8530)
-static u8 t9_config[] = {TOUCH_MULTITOUCHSCREEN_T9,
+
+static u8 t9_s8530_config[] = {TOUCH_MULTITOUCHSCREEN_T9, // for Wave2
 139,
 0, 0, //xorigin, yorigin
 19,11, //xsize, ysize
@@ -2102,8 +2057,8 @@ static u8 t9_config[] = {TOUCH_MULTITOUCHSCREEN_T9,
 143, 80, //yedgectrl, dist
 18//jumplimit
 };
-#else
-static u8 t9_config[] = {TOUCH_MULTITOUCHSCREEN_T9,
+
+static u8 t9_s8500_config[] = {TOUCH_MULTITOUCHSCREEN_T9, // for Wave1
 139,
 0, 0, //xorigin, yorigin
 16,10, //xsize, ysize
@@ -2117,7 +2072,7 @@ static u8 t9_config[] = {TOUCH_MULTITOUCHSCREEN_T9,
 143, 80, //yedgectrl, dist
 18//jumplimit
 };
-#endif
+
 static u8 t18_config[] = {SPT_COMCONFIG_T18,
 0, 1};
 static u8 t20_config[] = {PROCI_GRIPFACESUPPRESSION_T20,
@@ -2131,7 +2086,8 @@ static u8 end_config[] = {RESERVED_T255};
 static const u8 *mxt224_config[] = {
 	t7_config,
 	t8_config,
-	t9_config,
+	NULL, /* place for T9 config */
+//	t9_config,
 	t18_config,
 	t20_config,
 	t22_config,
@@ -2158,20 +2114,15 @@ static struct mxt224_platform_data mxt224_data = {
 /* I2C2 */
 static struct i2c_board_info i2c_devs2[] __initdata = {
 	{
-#if defined(CONFIG_SAMSUNG_GALAXYSB) // ffosilva : OK
-		I2C_BOARD_INFO(MXT224_DEV_NAME, 0x4a),
-		.platform_data = &mxt224_data,
-		.irq = IRQ_EINT_GROUP(3, 3),
-#else
 		I2C_BOARD_INFO(MXT224_DEV_NAME, 0x4a),
 		.platform_data = &mxt224_data,
 		.irq = IRQ_EINT_GROUP(18, 5),
-#endif
 	},
 };
 
 static void mxt224_init(void)
 {
+	mxt224_config[2] = t9_s8500_config;
 	return;
 }
 
@@ -2282,9 +2233,12 @@ static struct i2c_board_info i2c_devs6[] __initdata = {
 		I2C_BOARD_INFO("max8998", (0xCC >> 1)),
 		.platform_data	= &max8998_pdata,
 		.irq		= IRQ_EINT7,
-	}, {
-		I2C_BOARD_INFO("rtc_max8998", (0x0D >> 1)),
 	},
+/* MAX8998 MFC Driver will register it, so no need to even try it
+	{
+		I2C_BOARD_INFO("rtc_max8998", (0x0C >> 1)),
+	},
+*/
 #endif
 };
 
@@ -2295,15 +2249,10 @@ static int gp2a_power(bool on)
 	return 0;
 }
 
-static int gp2a_light_adc_value(void)
-{
-	return s3c_adc_get_adc_data(9);
-}
 
 static struct gp2a_platform_data gp2a_pdata = {
 	.power = gp2a_power,
 	.p_out = GPIO_PS_VOUT,
-	.light_adc_value = gp2a_light_adc_value
 };
 
 static void gp2a_gpio_init(void)
@@ -2321,7 +2270,7 @@ static void gp2a_gpio_init(void)
 #endif
 }
 
-static struct i2c_board_info i2c_devs11[] __initdata = {
+static struct i2c_board_info i2c_dev_gp2a[] __initdata = {
 	{
 		I2C_BOARD_INFO("gp2a", (0x88 >> 1)),
 		.platform_data = &gp2a_pdata,
@@ -2416,8 +2365,8 @@ static void __init android_pmem_set_platdata(void)
 }
 #endif
 
-struct platform_device sec_device_battery = {
-	.name	= "sec-battery",
+struct platform_device wave_charger_device = {
+	.name	= "wave_charger",
 	.id	= -1,
 };
 
@@ -2713,7 +2662,7 @@ static struct gpio_init_data wave_init_gpios[] = {
 	},
 
 	// GPD0 ----------------------------
-	{ //TODO: on S8530 should be configured by LCD driver
+	{
 		.num	= GPIO_LCD_BL_PWM,
 		.cfg	= S3C_GPIO_INPUT,
 		.val	= S3C_GPIO_SETPIN_NONE,
@@ -4444,7 +4393,7 @@ static int wlan_power_en(int onoff)
 		s3c_gpio_slp_setpull_updown(GPIO_WLAN_BT_EN,
 					S3C_GPIO_PULL_NONE);
 
-		msleep(80);
+		msleep(200);
 	} else {
 		gpio_set_value(GPIO_WLAN_nRST, GPIO_LEVEL_LOW);
 		s3c_gpio_slp_cfgpin(GPIO_WLAN_nRST, S3C_GPIO_SLP_OUT0);
@@ -4494,6 +4443,7 @@ static int wlan_carddetect_en(int onoff)
 	udelay(5);
 
 	sdhci_s3c_force_presence_change(&s3c_device_hsmmc1);
+	msleep(500); /* wait for carddetect */
 	return 0;
 }
 
@@ -4672,8 +4622,6 @@ static struct platform_device *wave_devices[] __initdata = {
 	&s5pv210_device_iis0,
 	&s3c_device_wdt,
 
-
-
 #ifdef CONFIG_VIDEO_MFC50
 	&s3c_device_mfc,
 #endif
@@ -4752,10 +4700,10 @@ static struct platform_device *wave_devices[] __initdata = {
 	&s3c_device_hsmmc3,
 #endif
 #ifdef CONFIG_VIDEO_TV20
-        &s5p_device_tvout,
+	&s5p_device_tvout,
 #endif
-	&sec_device_battery,
-	//&s3c_device_i2c10,
+	&wave_charger_device,
+
 
 #ifdef CONFIG_S5PV210_POWER_DOMAIN
 	&s5pv210_pd_audio,
@@ -4790,6 +4738,20 @@ static struct platform_device *wave_devices[] __initdata = {
 	&samsung_asoc_dma,
 };
 
+static void check_bigmem(void) {
+	int bootmode = __raw_readl(S5P_INFORM6);
+	if ((bootmode == 7) || (bootmode == 9)) {
+		bigmem = true;
+		wave_media_devs[2].memsize = S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC0_BM;
+		wave_media_devs[4].memsize = S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC0_BM;
+	}
+	else {
+		bigmem = false;
+		wave_media_devs[2].memsize = S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC0;
+		wave_media_devs[4].memsize = S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC0;
+	}
+}
+
 static void __init wave_map_io(void)
 {
 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
@@ -4799,6 +4761,7 @@ static void __init wave_map_io(void)
 	#ifndef CONFIG_S5P_HIGH_RES_TIMERS
 		s5p_set_timer_source(S5P_PWM3, S5P_PWM4);
 	#endif
+	check_bigmem();
 	s5p_reserve_bootmem(wave_media_devs,
 		ARRAY_SIZE(wave_media_devs), S5P_RANGE_MFC);
 #ifdef CONFIG_MTD_ONENAND
@@ -4823,8 +4786,8 @@ static void __init wave_fixup(struct machine_desc *desc,
 	mi->bank[1].size = 255 * SZ_1M;
 	mi->nr_banks = 2;
 
-	ram_console_start = mi->bank[1].start + mi->bank[1].size;
-	ram_console_size = SZ_1M - SZ_4K; /* 4K for PM debug scratchpad */
+	ram_console_start = mi->bank[1].start + mi->bank[1].size + SZ_1K; /* 1K to preserve Bada BootSharedInfo */
+	ram_console_size = SZ_1M - SZ_4K - SZ_1K; /* 4K for PM debug scratchpad  */
 
 	pm_debug_scratchpad = ram_console_start + ram_console_size;
 }
@@ -5022,8 +4985,6 @@ static void __init wave_machine_init(void)
 	wave_inject_cmdline();
 	platform_add_devices(wave_devices, ARRAY_SIZE(wave_devices));
 	console_suspend_enabled = 0;
-	/* smb380 */
-	/* platform_device_register(&wave_s3c_device_i2c5); */
 
 	/* Find out S5PC110 chip version */
 	_hw_version_check();
@@ -5083,10 +5044,6 @@ static void __init wave_machine_init(void)
 	/* max8998 */
 	i2c_register_board_info(6, i2c_devs6, ARRAY_SIZE(i2c_devs6));
 
-	/* cypress touchkey */
-	//touch_keypad_gpio_init();
-	//i2c_register_board_info(10, i2c_devs10, ARRAY_SIZE(i2c_devs10));
-
 	/* FSA9480 */
 	fsa9480_gpio_init();
 	i2c_register_board_info(7, i2c_devs7, ARRAY_SIZE(i2c_devs7));
@@ -5097,23 +5054,26 @@ static void __init wave_machine_init(void)
 
 	/* optical sensor */
 	gp2a_gpio_init();
-	i2c_register_board_info(11, i2c_devs11, ARRAY_SIZE(i2c_devs11));
+	i2c_register_board_info(0, i2c_dev_gp2a, ARRAY_SIZE(i2c_dev_gp2a));
 	
 	/* AK8973 magnetic sensor */
 	i2c_register_board_info(12, i2c_devs12, ARRAY_SIZE(i2c_devs12));
 
 	/* panel */
 #ifdef CONFIG_FB_S3C_TL2796
-	spi_register_board_info(tl2796_spi_board_info, ARRAY_SIZE(tl2796_spi_board_info));
-	s3cfb_set_platdata(&tl2796_data);
+	if(machine_is_wave()) {
+		spi_register_board_info(tl2796_spi_board_info, ARRAY_SIZE(tl2796_spi_board_info));
+		s3cfb_set_platdata(&tl2796_data);
+	}
 #endif
 
 #ifdef CONFIG_FB_S3C_LG4573
-	spi_register_board_info(lg4573_spi_board_info, ARRAY_SIZE(lg4573_spi_board_info));
-	s3cfb_set_platdata(&lg4573_data);
+	if(machine_is_wave2()) {
+		spi_register_board_info(lg4573_spi_board_info, ARRAY_SIZE(lg4573_spi_board_info));
+		s3cfb_set_platdata(&lg4573_data);
+	}
 #endif
 
-	
 #if defined(CONFIG_S5P_ADC)
 	s3c_adc_set_platdata(&s3c_adc_platform);
 #endif

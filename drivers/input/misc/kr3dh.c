@@ -415,7 +415,7 @@ static ssize_t kr3dh_delay_store(struct device *dev,
                                   const char *buf, size_t count)
 {
         unsigned long delay = simple_strtoul(buf, NULL, 10);
-        
+
         kr3dh_set_delay(dev, delay);
 
         return count;

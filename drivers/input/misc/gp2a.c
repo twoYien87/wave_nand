@@ -66,6 +66,8 @@
 
 #define DELAY_LOWBOUND	(5 * NSEC_PER_MSEC)
 
+static int global_adc = 0;
+
 /* start time delay for light sensor in nano seconds */
 #define LIGHT_SENSOR_START_TIME_DELAY 50000000
 
@@ -99,6 +101,8 @@ struct gp2a_data {
 	struct workqueue_struct *wq;
 	char val_state;
 };
+
+struct gp2a_data *_gp2a;
 
 int gp2a_i2c_write(struct gp2a_data *gp2a, u8 reg, u8 *val)
 {
@@ -164,7 +168,7 @@ static ssize_t poll_delay_store(struct device *dev,
 	struct gp2a_data *gp2a = dev_get_drvdata(dev);
 	int64_t new_delay;
 	int err;
-
+	
 	err = strict_strtoll(buf, 10, &new_delay);
 	if (err < 0)
 		return err;
@@ -222,7 +226,7 @@ static ssize_t light_enable_store(struct device *dev,
 		pr_err("%s: invalid value %d\n", __func__, *buf);
 		return -EINVAL;
 	}
-
+	
 	mutex_lock(&gp2a->power_lock);
 	gp2a_dbgmsg("new_value = %d, old state = %d\n",
 		    new_value, (gp2a->power_state & LIGHT_ENABLED) ? 1 : 0);
@@ -312,6 +316,12 @@ static struct attribute_group proximity_attribute_group = {
 	.attrs = proximity_sysfs_attrs,
 };
 
+int ls_get_adcvalue(void)
+{
+	return global_adc;
+}
+EXPORT_SYMBOL_GPL(ls_get_adcvalue);
+
 static void gp2a_work_func_light(struct work_struct *work)
 {
 	struct gp2a_data *gp2a = container_of(work, struct gp2a_data,
@@ -321,6 +331,8 @@ static void gp2a_work_func_light(struct work_struct *work)
 		pr_err("adc returned error %d\n", adc);
 		return;
 	}
+	global_adc = adc;
+
 	gp2a_dbgmsg("adc returned light value %d\n", adc);
 	input_report_abs(gp2a->light_input_dev, ABS_MISC, adc);
 	input_sync(gp2a->light_input_dev);
@@ -337,6 +349,9 @@ static enum hrtimer_restart gp2a_timer_func(struct hrtimer *timer)
 	hrtimer_forward_now(&gp2a->timer, gp2a->light_poll_delay);
 	return HRTIMER_RESTART;
 }
+
+int proximity_val;
+EXPORT_SYMBOL(proximity_val);
 
 /* interrupt happened due to transition/change of near/far proximity state */
 irqreturn_t gp2a_irq_handler(int irq, void *data)
@@ -361,6 +376,8 @@ irqreturn_t gp2a_irq_handler(int irq, void *data)
 	pr_err("gp2a: proximity val = %d\n", val);
 
 	/* 0 is close, 1 is far */
+	proximity_val = val;
+	
 	input_report_abs(ip->proximity_input_dev, ABS_DISTANCE, val);
 	input_sync(ip->proximity_input_dev);
 	wake_lock_timeout(&ip->prx_wake_lock, 3*HZ);
@@ -455,6 +472,8 @@ static int gp2a_i2c_probe(struct i2c_client *client,
 		return -ENOMEM;
 	}
 
+	_gp2a = gp2a;
+	
 	gp2a->pdata = pdata;
 	gp2a->i2c_client = client;
 	i2c_set_clientdata(client, gp2a);
@@ -592,6 +611,7 @@ static int gp2a_resume(struct device *dev)
 	/* Turn power back on if we were before suspend. */
 	struct i2c_client *client = to_i2c_client(dev);
 	struct gp2a_data *gp2a = i2c_get_clientdata(client);
+	
 	if (gp2a->power_state == LIGHT_ENABLED)
 		gp2a->pdata->power(true);
 	if (gp2a->power_state & LIGHT_ENABLED)

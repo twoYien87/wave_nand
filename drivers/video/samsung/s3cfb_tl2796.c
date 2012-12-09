@@ -68,7 +68,7 @@ struct s5p_lcd{
 	struct mutex	lock;
 	struct device *dev;
 	struct spi_device *g_spi;
-	struct s5p_panel_data	*data;
+	struct s5p_tl2796_panel_data	*data;
 	struct backlight_device *bl_dev;
 	struct early_suspend    early_suspend;
 	struct dentry *debug_dir;
@@ -94,7 +94,7 @@ static u32 gamma_lookup(struct s5p_lcd *lcd, u8 brightness, u32 val, int c)
 	u32 b;
 	u32 ret;
 	u64 tmp;
-	struct s5p_panel_data *pdata = lcd->data;
+	struct s5p_tl2796_panel_data *pdata = lcd->data;
 	const struct tl2796_gamma_adj_points *bv = lcd->gamma_adj_points;
 
 	if (!val) {
@@ -271,7 +271,7 @@ static void update_brightness(struct s5p_lcd *lcd)
 
 static void tl2796_ldi_enable(struct s5p_lcd *lcd)
 {
-	struct s5p_panel_data *pdata = lcd->data;
+	struct s5p_tl2796_panel_data *pdata = lcd->data;
 
 	mutex_lock(&lcd->lock);
 
@@ -285,7 +285,7 @@ static void tl2796_ldi_enable(struct s5p_lcd *lcd)
 
 static void tl2796_ldi_disable(struct s5p_lcd *lcd)
 {
-	struct s5p_panel_data *pdata = lcd->data;
+	struct s5p_tl2796_panel_data *pdata = lcd->data;
 
 	mutex_lock(&lcd->lock);
 
@@ -454,7 +454,7 @@ static void tl2796_parallel_read(struct s5p_lcd *lcd, u8 cmd,
 				 u8 *data, size_t len)
 {
 	int i;
-	struct s5p_panel_data *pdata = lcd->data;
+	struct s5p_tl2796_panel_data *pdata = lcd->data;
 	int delay = 10;
 
 	gpio_set_value(pdata->gpio_dcx, 0);
@@ -491,7 +491,7 @@ static void tl2796_parallel_read(struct s5p_lcd *lcd, u8 cmd,
 static int tl2796_parallel_setup_gpios(struct s5p_lcd *lcd, bool init)
 {
 	int ret;
-	struct s5p_panel_data *pdata = lcd->data;
+	struct s5p_tl2796_panel_data *pdata = lcd->data;
 
 	if (!pdata->configure_mtp_gpios)
 		return -EINVAL;
@@ -518,7 +518,7 @@ static u64 tl2796_voltage_lookup(struct s5p_lcd *lcd, int c, u32 v)
 	u32 vh = ~0, vl = ~0;
 	u32 bl, bh = 0;
 	u64 ret;
-	struct s5p_panel_data *pdata = lcd->data;
+	struct s5p_tl2796_panel_data *pdata = lcd->data;
 
 	for (i = 0; i < pdata->gamma_table_size; i++) {
 		vh = vl;
@@ -794,7 +794,7 @@ static int __devinit tl2796_probe(struct spi_device *spi)
 		ret = -EINVAL;
 		goto err_setup;
 	}
-	lcd->data = (struct s5p_panel_data *)spi->dev.platform_data;
+	lcd->data = (struct s5p_tl2796_panel_data *)spi->dev.platform_data;
 
 	if (!lcd->data->gamma_table || !lcd->data->seq_display_set ||
 		!lcd->data->seq_etc_set || !lcd->data->standby_on ||

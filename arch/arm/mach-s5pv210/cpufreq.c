@@ -649,7 +649,7 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 
 	/* Set max freq to 1GHz on startup */
 	ret = cpufreq_frequency_table_cpuinfo(policy, s5pv210_freq_table);
-	policy->min = 100000;
+	policy->min = 400000;
 	policy->max = 1000000;
 
 	return ret;

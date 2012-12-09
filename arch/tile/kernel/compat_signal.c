@@ -412,13 +412,9 @@ int compat_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->sp = ptr_to_compat_reg(frame);
 	regs->lr = restorer;
 	regs->regs[0] = (unsigned long) usig;
-
-	if (ka->sa.sa_flags & SA_SIGINFO) {
-		/* Need extra arguments, so mark to restore caller-saves. */
-		regs->regs[1] = ptr_to_compat_reg(&frame->info);
-		regs->regs[2] = ptr_to_compat_reg(&frame->uc);
-		regs->flags |= PT_FLAGS_CALLER_SAVES;
-	}
+	regs->regs[1] = ptr_to_compat_reg(&frame->info);
+	regs->regs[2] = ptr_to_compat_reg(&frame->uc);
+	regs->flags |= PT_FLAGS_CALLER_SAVES;
 
 	/*
 	 * Notify any tracer that was single-stepping it.
